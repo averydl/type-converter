@@ -1,18 +1,20 @@
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
+import java.awt.event.KeyListener;
+import java.awt.event.KeyEvent;
+import java.awt.Color;
+import javax.swing.JColorChooser;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import javax.swing.SpringLayout;
 
 /**
  *
@@ -29,20 +31,26 @@ public class ConverterGUI {
     private JLabel octLbl = new JLabel("Octal");
     private JLabel hexLbl = new JLabel("Hex");
     private JLabel ascLbl = new JLabel("Characters");
+    private JLabel colLbl = new JLabel("Color");
+    private JLabel fltLbl = new JLabel("Float Decimal");
 
-    // text fields for numeric types to be converted
+    // text fields for types to be converted
     private JTextField decTxt = new JTextField();
     private JTextField binTxt = new JTextField();
     private JTextField octTxt = new JTextField();
     private JTextField hexTxt = new JTextField();
     private JTextField ascTxt = new JTextField();
-
-    // text fields for color and float representations
     private JTextField colTxt = new JTextField();
-    private JTextField fpnTxt = new JTextField();
+    private JTextField fltTxt = new JTextField();
+
+    // last text field altered by user
+    private JTextField lastAlteredTxt;
 
     private JButton convertBtn = new JButton("Convert");
     private JButton clearBtn = new JButton("Clear");
+    private JButton colorBtn = new JButton("Choose Color");
+    
+    private Color curColor = Color.WHITE;
 
     public static void main(String[] args) {
         ConverterGUI gui = new ConverterGUI();
@@ -54,32 +62,110 @@ public class ConverterGUI {
         octTxt.setText(TypeConverter.decToOct(value));
         hexTxt.setText(TypeConverter.decToHex(value));
         ascTxt.setText(TypeConverter.binToChars(binTxt.getText()));
+        colTxt.setBackground(new Color(value));
+        fltTxt.setText(TypeConverter.binaryToFloat(binTxt.getText()));
+    }
+
+    /*
+     * Adds empty String to every JTextField in 
+     * the JPanel GUI; sets background color to 'black'
+     */
+    public void clearFields() {
+        decTxt.setText("");
+        binTxt.setText("");
+        octTxt.setText("");
+        hexTxt.setText("");
+        ascTxt.setText("");
+        curColor = Color.WHITE;
+        colTxt.setBackground(curColor);
+        fltTxt.setText("");
+    }
+
+    public void setFields() {
+        if (lastAlteredTxt == decTxt) {
+            convertFields(TypeConverter.stringToInt(decTxt.getText()));
+        } else if (lastAlteredTxt == binTxt) {
+            try {
+                convertFields(TypeConverter.binaryStringToInt(binTxt.getText()));
+            } catch (Exception exc) {
+                binTxt.setText("Invalid binary format");
+            }
+        } else if (lastAlteredTxt == octTxt) {
+            try {
+                convertFields(TypeConverter.octalStringToInt(octTxt.getText()));
+            } catch (Exception exc) {
+                octTxt.setText("Invalid octal format");
+            }
+        } else if (lastAlteredTxt == hexTxt) {
+            try {
+                convertFields(TypeConverter.hexStringToInt(hexTxt.getText()));
+            } catch (Exception exc) {
+                hexTxt.setText("Invalid hexadecimal format");
+            }
+        } else if (lastAlteredTxt == ascTxt) {
+            String binaryChars = TypeConverter.stringToBin(ascTxt.getText());
+            try {
+                convertFields(TypeConverter.binaryStringToInt(binaryChars));
+            } catch (Exception exc) {
+                ascTxt.setText("Invalid character input");
+            }
+        } else if(lastAlteredTxt == colTxt) {
+            try {
+                convertFields(TypeConverter.binaryStringToInt(TypeConverter.colorToBinary(curColor)));
+            } catch (Exception exc) {
+                clearFields();
+            }
+        } else if(lastAlteredTxt == fltTxt) {
+            try {
+                convertFields(TypeConverter.binaryStringToInt(TypeConverter.floatToBinary(fltTxt.getText())));
+            } catch (Exception exc) {
+                fltTxt.setText("Invalid float format");
+            }
+        }
     }
 
     public ConverterGUI() {
+        
+        // no text has been altered on instantiation
+        lastAlteredTxt = null;
 
-        // set appropriate default colors for GUI 
-        // background and color display window
-        pnl.setBackground(new Color(0xB7A57A));
-        colTxt.setBackground(new Color(0x4B2E83));
+        // set up sizing
+        convertBtn.setPreferredSize(new Dimension(50, 4));
+        clearBtn.setPreferredSize(new Dimension(50, 4));
+
+        pnl.setLayout(new GridLayout(0, 3));
 
         // add GUI components to JPanel
-        pnl.setLayout(new GridLayout(0, 2));
         pnl.add(decLbl);
         pnl.add(decTxt);
+        pnl.add(new JPanel());
 
         pnl.add(binLbl);
         pnl.add(binTxt);
+        pnl.add(new JPanel());
 
         pnl.add(octLbl);
         pnl.add(octTxt);
+        pnl.add(new JPanel());
 
         pnl.add(hexLbl);
         pnl.add(hexTxt);
+        pnl.add(new JPanel());
 
         pnl.add(ascLbl);
         pnl.add(ascTxt);
+        pnl.add(new JPanel());
 
+        pnl.add(colLbl);
+        pnl.add(colTxt);
+        pnl.add(colorBtn);
+        
+        colTxt.setBackground(curColor);
+
+        pnl.add(fltLbl);
+        pnl.add(fltTxt);
+        pnl.add(new JPanel());
+        
         pnl.add(convertBtn);
         pnl.add(clearBtn);
 
@@ -91,47 +177,232 @@ public class ConverterGUI {
         frm.pack();
         frm.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        // add action listener to submit button to convert
-        // user-entered color values to Hex color
+        
+        /*
+         * Add action listener to 'convert' button to convert
+         * all fields. 
+         *
+         * NOTE: The fields will be converted using the textfield
+         *       which has been changed most recently, which is tracked
+         *       using the @param lastAlteredTxt reference
+         */
         convertBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (decTxt.getText().length() > 0) {
-                    convertFields(Integer.parseInt(decTxt.getText()));
-                } else if (binTxt.getText().length() > 0) {
-                    convertFields(Integer.parseInt(binTxt.getText(), 2));
-                } else if (octTxt.getText().length() > 0) {
-                    convertFields(Integer.parseInt(octTxt.getText(), 8));
-                } else if(hexTxt.getText().length() > 0) {
-                    String hexNumber = hexTxt.getText().substring(2, hexTxt.getText().length());
-                    try {
-                        convertFields(Integer.parseInt(hexNumber, 16));
-                    } catch(NumberFormatException nfe) {
-                        hexTxt.setText("Invalid hexadecimal format");
-                    }
-                } else if (ascTxt.getText().length() > 0) {
-                    String binaryChars = TypeConverter.stringToBin(ascTxt.getText());
-                    convertFields(Integer.parseInt(binaryChars, 2));
+                setFields();
+            }
+        }
+        );
+        
+        /* 
+         * Add on-click action listener to @param colorBtn to 
+         * allow users to select/change the @param colTxt background
+         * color using the JColorChooser object
+         */
+        colorBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                curColor = JColorChooser.showDialog(pnl, "Color Selector", new Color(0x4b2e83));
+                colTxt.setBackground(curColor);
+                lastAlteredTxt = colTxt;
+                try {
+                    convertFields(TypeConverter.binaryStringToInt(TypeConverter.colorToBinary(curColor)));
+                } catch (Exception exc) {
+                    //do nothing
                 }
             }
         }
         );
 
-        // add action listener to clear button to 
-        // empty all text fields upon clicking
+        /*
+         * add action listener to clear button to 
+         * empty all text fields upon clicking
+         */
         clearBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                decTxt.setText("");
-                binTxt.setText("");
-                octTxt.setText("");
-                hexTxt.setText("");
-                ascTxt.setText("");
+                clearFields();
+                lastAlteredTxt = null;
             }
         }
         );
+
+        /* 
+         * add KeyListener to repopulate all fields if 
+         * text is re-entered in the @param decTxt field 
+         */
+        decTxt.addKeyListener(new KeyListener() {
+
+            @Override
+            public void keyTyped(KeyEvent e) {
+                lastAlteredTxt = decTxt;
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    try {
+                        convertFields(TypeConverter.stringToInt(decTxt.getText()));
+                    } catch (Exception exc) {
+                        decTxt.setText("Invalid decimal input");
+                    }
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                // no action
+            }
+        }
+        );
+
+        /* 
+         * add KeyListener to repopulate all fields if 
+         * text is re-entered in the @param binTxt field 
+         */
+        binTxt.addKeyListener(new KeyListener() {
+
+            @Override
+            public void keyTyped(KeyEvent e) {
+                lastAlteredTxt = binTxt;
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    try {
+                        convertFields(TypeConverter.binaryStringToInt(binTxt.getText()));
+                    } catch (Exception exc) {
+                        binTxt.setText("Invalid binary input");
+                    }
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                // no action
+            }
+        }
+        );
+
+        /* 
+         * add KeyListener to repopulate all fields if 
+         * text is re-entered in the @param octTxt field 
+         */
+        octTxt.addKeyListener(new KeyListener() {
+
+            @Override
+            public void keyTyped(KeyEvent e) {
+                lastAlteredTxt = octTxt;
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    try {
+                        convertFields(TypeConverter.octalStringToInt(octTxt.getText()));
+                    } catch (Exception exc) {
+                        octTxt.setText("Invalid octal input");
+                    }
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                // no action
+            }
+        }
+        );
+
+        /* 
+         * add KeyListener to repopulate all fields if 
+         * text is re-entered in the @param hexTxt field 
+         */
+        hexTxt.addKeyListener(new KeyListener() {
+
+            @Override
+            public void keyTyped(KeyEvent e) {
+                lastAlteredTxt = hexTxt;
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    try {
+                        convertFields(TypeConverter.hexStringToInt(hexTxt.getText()));
+                    } catch (Exception exc) {
+                        hexTxt.setText("Invalid Hex input");
+                    }
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                // no action
+            }
+        }
+        );
+
+        /* 
+         * add KeyListener to repopulate all fields if 
+         * text is re-entered in the @param ascTxt field 
+         */
+        ascTxt.addKeyListener(new KeyListener() {
+
+            @Override
+            public void keyTyped(KeyEvent e) {
+                lastAlteredTxt = ascTxt;
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    try {
+                        convertFields(TypeConverter.binaryStringToInt(TypeConverter.stringToBin(ascTxt.getText())));
+                    } catch (Exception exc) {
+                        ascTxt.setText("Invalid ASCII input");
+                    }
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                // no action
+            }
+        }
+        );
+        
+        /* 
+         * add KeyListener to repopulate all fields if 
+         * text is re-entered in the @param decTxt field 
+         */
+        fltTxt.addKeyListener(new KeyListener() {
+
+            @Override
+            public void keyTyped(KeyEvent e) {
+                lastAlteredTxt = fltTxt;
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    try {
+                        convertFields(TypeConverter.binaryStringToInt(TypeConverter.floatToBinary(fltTxt.getText())));
+                    } catch (Exception exc) {
+                        fltTxt.setText("Invalid float input: " + exc);
+                    }
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                // no action
+            }
+        }
+        );
+
     }
-    
+
     /*
      * nested static class used for conversions
      * between decimal and non-decimal types, 
@@ -139,6 +410,99 @@ public class ConverterGUI {
      * character Strings
      */
     public static class TypeConverter {
+
+        public static int charToInt(char digit) {
+            switch (digit) {
+                case '0':
+                    return 0;
+                case '1':
+                    return 1;
+                case '2':
+                    return 2;
+                case '3':
+                    return 3;
+                case '4':
+                    return 4;
+                case '5':
+                    return 5;
+                case '6':
+                    return 6;
+                case '7':
+                    return 7;
+                case '8':
+                    return 8;
+                case '9':
+                    return 9;
+                default:
+                    throw new IllegalArgumentException();
+
+            }
+        }
+
+        public static int stringToInt(String number) {
+            int pow = 0;
+            int result = 0;
+            for (int i = number.length() - 1; i >= 0; i--) {
+                result += charToInt(number.charAt(i)) * Math.pow(10, pow);
+                pow++;
+            }
+            return result;
+        }
+
+        public static int binaryStringToInt(String number) {
+            int pow = 0;
+            int result = 0;
+            for (int i = number.length() - 1; i >= 0; i--) {
+                result += charToInt(number.charAt(i)) * Math.pow(2, pow);
+                pow++;
+            }
+            return result;
+        }
+
+        public static int octalStringToInt(String number) {
+            int pow = 0;
+            int result = 0;
+            for (int i = number.length() - 1; i >= 0; i--) {
+                result += charToInt(number.charAt(i)) * Math.pow(8, pow);
+                pow++;
+            }
+            return result;
+        }
+
+        public static int hexStringToInt(String number) throws Exception {
+            if(number.length() < 2 || number.charAt(0) != '0' || number.charAt(1) != 'x')
+                throw new Exception();
+            else 
+                number = number.substring(2, number.length());
+            int pow = 0;
+            int result = 0;
+            for (int i = number.length() - 1; i >= 0; i--) {
+                switch (number.charAt(i)) {
+                    case 'A':
+                        result += 10 * Math.pow(16, pow);
+                        break;
+                    case 'B':
+                        result += 11 * Math.pow(16, pow);
+                        break;
+                    case 'C':
+                        result += 12 * Math.pow(16, pow);
+                        break;
+                    case 'D':
+                        result += 13 * Math.pow(16, pow);
+                        break;
+                    case 'E':
+                        result += 14 * Math.pow(16, pow);
+                        break;
+                    case 'F':
+                        result += 15 * Math.pow(16, pow);
+                        break;
+                    default:
+                        result += charToInt(number.charAt(i)) * Math.pow(16, pow);
+                }
+                pow++;
+            }
+            return result;
+        }
 
         /* 
          * Converts integer argument to a binary
@@ -150,6 +514,11 @@ public class ConverterGUI {
                 result = number % 2 + result;
                 number /= 2;
             }
+
+            while (result.length() % 8 != 0) {
+                result = '0' + result;
+            }
+
             return result;
         }
 
@@ -230,10 +599,100 @@ public class ConverterGUI {
             String result = "";
             for (int i = 0; i < str.length(); i++) {
                 result += decToBin(str.charAt(i));
-                while(result.length() % 8 != 0)
+                while (result.length() % 8 != 0) {
                     result = "0" + result;
+                }
             }
             return result;
+        }
+
+        /* 
+         * Converts a Color object to a binary string 
+         * representing its respective alpha/RGB components
+         */
+        public static String colorToBinary(Color color) {
+            StringBuilder result = new StringBuilder();
+            String red = TypeConverter.decToBin(color.getRed());
+            String green = TypeConverter.decToBin(color.getGreen());
+            String blue = TypeConverter.decToBin(color.getBlue());
+
+            result.append(red);
+            result.append(green);
+            result.append(blue);
+            return result.toString();
+        }
+        
+        /* 
+         * Converts a binary String to its corresponding 'float'
+         * value per the IEEE standard, and returns this value 
+         * in String format
+         */
+        public static String binaryToFloat(String number) {
+            while(number.length() < 32) {
+                number = "0" + number;
+            }
+            String result = "1.";
+            
+            // add negative sign if 'float' has leading '1'
+            if(number.charAt(0) == '1')
+                result = "-" + result;
+
+            // calculate exponent using excess-127 per IEEE standard
+            int exponent = TypeConverter.binaryStringToInt(number.substring(1, 9))-127;
+            
+            // calculate mantissa of the float
+            int power = -1;
+            double sum = 0;
+            for(int i = 10; i < 32; i++) {
+                sum += TypeConverter.stringToInt(""+number.charAt(i))/Math.pow(2, power);
+                power--;
+            }
+            
+            result = result + sum;
+            result = result.substring(0, result.length()-2) + "e" + exponent;
+            return result;
+        }
+        
+        /* 
+         * Converts a 'float' in String form to its corresponding
+         * binary value per the IEEE standard, and returns it in 
+         * String format
+         */
+        public static String floatToBinary(String number) {
+            StringBuilder result = new StringBuilder();
+            
+            if(number.charAt(0) == '-') {
+                result.append("1");
+            } else {
+                result.append("0");
+            }
+            
+            
+            // convert decimal portion of 'float' to a floating point number
+            int power = -1;
+            float mantissa = 0;
+            
+            for(int i = number.indexOf('.')+1; i < number.length(); i++) {
+                mantissa += TypeConverter.stringToInt(""+number.charAt(i))*Math.pow(10, power);
+                power--;
+            }
+            
+            // append remaining binary digits (mantissa) of float
+            while(result.length() < 32 && mantissa-0 > Math.pow(10, -10)) {
+                mantissa *= 2; 
+                if(mantissa > 1) {
+                    result.append(1);
+                    mantissa -= 1;
+                } else {
+                    result.append(0);
+                }
+            }
+            
+            while(result.length() < 32)
+                result.append("0");
+
+            return result.toString();
+            
         }
     }
 }
