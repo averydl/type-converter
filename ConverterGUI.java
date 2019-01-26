@@ -390,6 +390,7 @@ public class ConverterGUI {
                         convertFields(TypeConverter.binaryStringToInt(TypeConverter.floatToBinary(fltTxt.getText())));
                     } catch (Exception exc) {
                         fltTxt.setText("Invalid float input: " + exc);
+                        exc.printStackTrace();
                     }
                 }
             }
@@ -628,28 +629,29 @@ public class ConverterGUI {
          * in String format
          */
         public static String binaryToFloat(String number) {
-            while(number.length() < 32) {
-                number = "0" + number;
-            }
-            String result = "1.";
+            while(number.length() < 32)
+                number += "0";
+            String result = "";
             
             // add negative sign if 'float' has leading '1'
             if(number.charAt(0) == '1')
-                result = "-" + result;
+                result += "-";
 
-            // calculate exponent using excess-127 per IEEE standard
-            int exponent = TypeConverter.binaryStringToInt(number.substring(1, 9))-127;
+            // calculate exponent of the floating point number
+            int power = TypeConverter.binaryStringToInt(number.substring(1, 9))-127;
             
             // calculate mantissa of the float
-            int power = -1;
             double sum = 0;
-            for(int i = 10; i < 32; i++) {
-                sum += TypeConverter.stringToInt(""+number.charAt(i))/Math.pow(2, power);
-                power--;
+            int exp = power;
+            
+            for(int i = 9; i < 32; i++) {
+                if(number.charAt(i) == '1')
+                    sum += Math.pow(2, exp);
+                exp--;
             }
             
             result = result + sum;
-            result = result.substring(0, result.length()-2) + "e" + exponent;
+
             return result;
         }
         
@@ -660,39 +662,42 @@ public class ConverterGUI {
          */
         public static String floatToBinary(String number) {
             StringBuilder result = new StringBuilder();
-            
-            if(number.charAt(0) == '-') {
+            float num = Float.parseFloat(number);
+
+            if(num < 0) {
                 result.append("1");
+                num *= -1;
             } else {
                 result.append("0");
             }
             
             
-            // convert decimal portion of 'float' to a floating point number
-            int power = -1;
-            float mantissa = 0;
+            // extract leading non-decimal portion of number
+            String lead = TypeConverter.decToBin((int) num);
+            lead = lead.substring(lead.indexOf('1'), lead.length());
+
+            num = num % 1;
             
-            for(int i = number.indexOf('.')+1; i < number.length(); i++) {
-                mantissa += TypeConverter.stringToInt(""+number.charAt(i))*Math.pow(10, power);
-                power--;
-            }
+            int exp = lead.length()-1;
             
-            // append remaining binary digits (mantissa) of float
-            while(result.length() < 32 && mantissa-0 > Math.pow(10, -10)) {
-                mantissa *= 2; 
-                if(mantissa > 1) {
-                    result.append(1);
-                    mantissa -= 1;
+            // append exponent portion of float to @param result
+            result.append(TypeConverter.decToBin(exp+127).substring(0,8));
+
+            
+            // append mantissa to @param result
+            result.append(lead);
+            
+            while(result.length() < 32) {
+                num *= 2;
+                if(num > 1.0) {
+                    result.append("1");
+                    num -= 1;
                 } else {
-                    result.append(0);
+                    result.append("0");
                 }
             }
             
-            while(result.length() < 32)
-                result.append("0");
-
             return result.toString();
-            
         }
     }
 }
